@@ -1,0 +1,32 @@
+[package]
+name = "metrics-datadog-exporter"
+version = "0.1.2-alpha.0"
+authors = ["Aaron Griffin <aaron.griffin+github@protonmail.ch>"]
+edition = "2018"
+
+license = "MIT"
+description = "A metrics-compatible exporter that sends metrics to DataDog"
+repository = "https://github.com/aig787/metrics-datadog-exporter"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+metrics = "^0.16"
+metrics-util = "^0.9"
+parking_lot = "^0.11"
+thiserror = "^1.0"
+serde = { version = "^1.0", features = ["derive"] }
+serde_json = "^1.0"
+serde_with = "^1.9"
+chrono = "^0.4"
+reqwest = { version = "^0.11", features = ["json"] }
+tokio = { version = "^1.5", features = ["macros"] }
+tokio_schedule = "^0.2"
+log = "^0.4"
+
+[dev-dependencies]
+metrics-macros = "0.4.0"
+anyhow = "1.0.40"
+httpmock = "0.5.8"
+once_cell = "1.7.2"
+env_logger = "0.8.3"
