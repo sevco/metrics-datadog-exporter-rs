@@ -18,7 +18,7 @@ jobs:
           override: true
       - name: Install cargo-release
         run: cargo install cargo-release
-      - uses: oleksiyrudenko/gha-git-credentials@v2-latest
+      - uses: oleksiyrudenko/gha-git-credentials@v2.1
         with:
           token: '${{ secrets.GITHUB_TOKEN }}'
       - name: Release
