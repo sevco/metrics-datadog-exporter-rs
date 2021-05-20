@@ -1,12 +1,12 @@
 [package]
 name = "metrics-datadog-exporter"
 version = "0.1.2-alpha.0"
-authors = ["Aaron Griffin <aaron.griffin+github@protonmail.ch>"]
+authors = ["Aaron Griffin <aaron@sevco.io"]
 edition = "2018"
 
 license = "MIT"
 description = "A metrics-compatible exporter that sends metrics to DataDog"
-repository = "https://github.com/aig787/metrics-datadog-exporter"
+repository = "https://github.com/sevco/metrics-datadog-exporter-rs"
 documentation = "https://docs.rs/metrics-datadog-exporter"
 readme = "README.md"
 
