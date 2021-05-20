@@ -1,6 +1,7 @@
 # metrics-datadog-exporter
 
 ![Crates.io](https://img.shields.io/crates/v/metrics-datadog-exporter)
+![docs.rs](https://docs.rs/metrics-datadog-exporter/badge.svg)
 ![GitHub Workflow Status](https://img.shields.io/github/workflow/status/sevco/metrics-datadog-exporter-rs/CI)
 
 ### Metrics reporter for https://github.com/metrics-rs/metrics that writes to DataDog.
