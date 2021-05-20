@@ -1,11 +1,12 @@
-use crate::handle::DataDogHandle;
+use crate::exporter::DataDogExporter;
 use crate::recorder::DataDogRecorder;
-use crate::DataDogMetrics;
+use crate::DataDogHandle;
 use metrics::{Key, Label};
 use metrics_util::{Handle, NotTracked, Registry};
 use reqwest::Client;
 use std::sync::Arc;
 
+/// Builder for creating/installing a DataDog recorder/exporter
 pub struct DataDogBuilder {
     write_to_stdout: bool,
     write_to_api: bool,
@@ -15,6 +16,7 @@ pub struct DataDogBuilder {
 }
 
 impl DataDogBuilder {
+    /// Creates a new [`DataDogBuilder`]
     pub fn default() -> Self {
         DataDogBuilder {
             write_to_stdout: true,
@@ -25,6 +27,7 @@ impl DataDogBuilder {
         }
     }
 
+    /// Write metrics to stdout in DataDog JSON format
     pub fn write_to_stdout(self, b: bool) -> DataDogBuilder {
         DataDogBuilder {
             write_to_stdout: b,
@@ -32,6 +35,7 @@ impl DataDogBuilder {
         }
     }
 
+    /// Write metrics to DataDog API
     pub fn write_to_api(self, b: bool, api_key: Option<String>) -> DataDogBuilder {
         DataDogBuilder {
             write_to_api: b,
@@ -40,10 +44,12 @@ impl DataDogBuilder {
         }
     }
 
+    /// Set DataDog API host
     pub fn api_host(self, api_host: String) -> DataDogBuilder {
         DataDogBuilder { api_host, ..self }
     }
 
+    /// Set tags to send with metrics
     pub fn tags(self, tags: Vec<(String, String)>) -> DataDogBuilder {
         DataDogBuilder {
             tags: tags.iter().map(Label::from).collect(),
@@ -51,10 +57,11 @@ impl DataDogBuilder {
         }
     }
 
-    pub fn build(&self) -> DataDogMetrics {
+    /// Build [`DataDogHandle`]
+    pub fn build(&self) -> DataDogHandle {
         let registry = Arc::new(Registry::<Key, Handle, NotTracked<Handle>>::untracked());
         let recorder = DataDogRecorder::new(registry.clone());
-        let handle = DataDogHandle::new(
+        let handle = DataDogExporter::new(
             registry,
             self.write_to_stdout,
             self.write_to_api,
@@ -67,6 +74,6 @@ impl DataDogBuilder {
             self.api_key.clone(),
             self.tags.clone(),
         );
-        DataDogMetrics { recorder, handle }
+        DataDogHandle { recorder, handle }
     }
 }

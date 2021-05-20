@@ -1,3 +1,5 @@
+//! Data model
+//!
 use chrono::Utc;
 use metrics::{Key, Label};
 use metrics_util::{Handle, MetricKind};
@@ -6,34 +8,47 @@ use serde_with::skip_serializing_none;
 
 static LAMBDA_HOSTNAME: &str = "lambda";
 
+/// Metric type
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq, PartialOrd, Ord)]
 pub enum DataDogMetricType {
+    /// Counter
     #[serde(rename = "count")]
     Count,
+    /// Gauge
     #[serde(rename = "gauge")]
     Gauge,
+    /// Histogram
     #[serde(rename = "histogram")]
     Histogram,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialOrd, PartialEq)]
 #[serde(untagged)]
+/// Metric value
 pub enum DataDogMetricValue {
+    /// Float
     Float(f64),
+    /// Int
     Int(u64),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialOrd, PartialEq)]
+/// DataDog formatted metric
 pub struct DataDogMetric {
+    /// Metric name
     pub metric_name: String,
+    /// Metric type
     pub metric_type: DataDogMetricType,
+    /// Metric values
     pub points: Vec<DataDogMetricValue>,
+    /// Timestamp
     pub timestamp: i64,
+    /// Tags
     pub tags: Vec<String>,
 }
 
 impl DataDogMetric {
-    pub fn from_metric(
+    pub(crate) fn from_metric(
         kind: &MetricKind,
         key: &Key,
         handle: &Handle,
@@ -65,7 +80,7 @@ impl DataDogMetric {
         }
     }
 
-    pub fn from_metric_value(
+    fn from_metric_value(
         metric_type: DataDogMetricType,
         key: &Key,
         values: Vec<DataDogMetricValue>,
@@ -84,7 +99,7 @@ impl DataDogMetric {
         }
     }
 
-    pub fn to_metric_lines(&self) -> Vec<DataDogMetricLine> {
+    pub(crate) fn to_metric_lines(&self) -> Vec<DataDogMetricLine> {
         self.points
             .iter()
             .map(|v| DataDogMetricLine {

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use httpmock::Method::POST;
 use httpmock::MockServer;
-use metrics_datadog_exporter::builder::DataDogBuilder;
+use metrics_datadog_exporter::DataDogBuilder;
 use metrics_macros::counter;
 
 #[tokio::test]

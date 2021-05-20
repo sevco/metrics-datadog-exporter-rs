@@ -1,6 +1,7 @@
 use anyhow::Result;
-use metrics_datadog_exporter::builder::DataDogBuilder;
-use metrics_datadog_exporter::data::{DataDogMetric, DataDogMetricType, DataDogMetricValue};
+use metrics_datadog_exporter::{
+    DataDogBuilder, DataDogMetric, DataDogMetricType, DataDogMetricValue,
+};
 use metrics_macros::{counter, gauge, histogram};
 use std::collections::HashMap;
 

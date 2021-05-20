@@ -1,7 +1,8 @@
-use metrics::{GaugeValue, Key, Recorder, SetRecorderError, Unit};
+use metrics::{GaugeValue, Key, Recorder, Unit};
 use metrics_util::{Handle, MetricKind, NotTracked, Registry};
 use std::sync::Arc;
 
+/// Metric recorder
 pub struct DataDogRecorder {
     registry: Arc<Registry<Key, Handle, NotTracked<Handle>>>,
 }
@@ -9,12 +10,6 @@ pub struct DataDogRecorder {
 impl DataDogRecorder {
     pub(crate) fn new(registry: Arc<Registry<Key, Handle, NotTracked<Handle>>>) -> Self {
         DataDogRecorder { registry }
-    }
-
-    pub fn install(self) -> Result<(), SetRecorderError> {
-        log::info!("Setting DataDog metric recorder");
-        metrics::set_boxed_recorder(Box::new(self))?;
-        Ok(())
     }
 }
 

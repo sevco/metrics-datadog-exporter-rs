@@ -1,14 +1,14 @@
 use anyhow::Result;
 use log::LevelFilter;
-use metrics_datadog_exporter::builder::DataDogBuilder;
-use metrics_datadog_exporter::handle::DataDogHandle;
+use metrics_datadog_exporter::DataDogBuilder;
+use metrics_datadog_exporter::DataDogExporter;
 use metrics_macros::{counter, gauge, histogram};
 use once_cell::sync::Lazy;
 use std::ops::Deref;
 use std::time::Duration;
 use tokio::time::sleep;
 
-static DD_METRICS: Lazy<DataDogHandle> = Lazy::new(|| {
+static DD_METRICS: Lazy<DataDogExporter> = Lazy::new(|| {
     DataDogBuilder::default()
         .tags(vec![("tag1".to_string(), "value1".to_string())])
         .write_to_stdout(true)

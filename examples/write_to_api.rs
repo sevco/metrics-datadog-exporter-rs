@@ -1,5 +1,5 @@
 use anyhow::Result;
-use metrics_datadog_exporter::builder::DataDogBuilder;
+use metrics_datadog_exporter::DataDogBuilder;
 use metrics_macros::{counter, gauge, histogram};
 
 #[tokio::main(flavor = "current_thread")]

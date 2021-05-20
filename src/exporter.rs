@@ -10,7 +10,8 @@ use tokio::spawn;
 use tokio::task::JoinHandle;
 use tokio_schedule::{every, Job};
 
-pub struct DataDogHandle {
+/// Metric exporter
+pub struct DataDogExporter {
     registry: Arc<Registry<Key, Handle, NotTracked<Handle>>>,
     write_to_stdout: bool,
     write_to_api: bool,
@@ -20,7 +21,7 @@ pub struct DataDogHandle {
     tags: Vec<Label>,
 }
 
-impl DataDogHandle {
+impl DataDogExporter {
     pub(crate) fn new(
         registry: Arc<Registry<Key, Handle, NotTracked<Handle>>>,
         write_to_stdout: bool,
@@ -30,7 +31,7 @@ impl DataDogHandle {
         api_key: Option<String>,
         tags: Vec<Label>,
     ) -> Self {
-        DataDogHandle {
+        DataDogExporter {
             registry,
             write_to_stdout,
             write_to_api,
@@ -41,6 +42,7 @@ impl DataDogHandle {
         }
     }
 
+    /// Write metrics every [`Duration`]
     pub fn schedule(&'static self, interval: Duration) -> JoinHandle<()> {
         let every = every(interval.as_secs() as u32)
             .seconds()
@@ -53,6 +55,9 @@ impl DataDogHandle {
         spawn(every)
     }
 
+    /// Collect metrics
+    ///
+    /// Note: This will clear histogram observations    
     pub fn collect(&self) -> Vec<DataDogMetric> {
         self.registry
             .get_handles()
@@ -63,6 +68,7 @@ impl DataDogHandle {
             .collect()
     }
 
+    /// Flush metrics
     pub async fn flush(&self) -> Result<()> {
         let metrics: Vec<DataDogMetric> = self.collect();
         log::debug!("Flushing {} metrics", metrics.len());
