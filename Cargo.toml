@@ -23,7 +23,7 @@ serde_with = "^1.9"
 chrono = "^0.4"
 reqwest = { version = "^0.11", features = ["json"] }
 tokio = { version = "^1.5", features = ["macros"] }
-tokio_schedule = "^0.2"
+tokio_schedule = "^0.3"
 log = "^0.4"
 
 [dev-dependencies]
