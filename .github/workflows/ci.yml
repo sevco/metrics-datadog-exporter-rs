@@ -1,4 +1,4 @@
-name: CI
+name: Rust
 
 on:
   push:
@@ -6,63 +6,91 @@ on:
       - master
       - dev
   pull_request:
+  pull_request_target:
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    # If the PR is coming from a fork (pull_request_target), ensure it's opened by "dependabot[bot]".
+    # Otherwise, clone it normally.
+    if: |
+      (github.event_name == 'pull_request_target' && github.actor == 'dependabot[bot]') ||
+      (github.event_name != 'pull_request_target' && github.actor != 'dependabot[bot]')
     steps:
-      - uses: actions/checkout@v2
-      - uses: Swatinem/rust-cache@v1
+      - name: Checkout
+        if: ${{ github.event_name != 'pull_request_target' }}
+        uses: actions/checkout@v2
+      - name: Checkout PR
+        if: ${{ github.event_name == 'pull_request_target' }}
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
       - uses: actions-rs/toolchain@v1.0.7
         with:
           toolchain: stable
           override: true
+      - uses: Swatinem/rust-cache@v1
       - name: Run tests
-        run: cargo test
+        run: cargo test --all-features
   dependencies:
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
-      - uses: actions/checkout@v2
-      - uses: Swatinem/rust-cache@v1
-        with:
-          key: nightly
+      - name: Checkout
+        uses: actions/checkout@v2
       - name: Install nightly toolchain
         uses: actions-rs/toolchain@v1.0.7
         with:
           toolchain: nightly
           override: true
+      - uses: Swatinem/rust-cache@v1
       - name: Check for unused dependencies
         uses: aig787/cargo-udeps-action@v1
         with:
           args: --all-targets --all-features
   format:
     runs-on: ubuntu-latest
+    # If the PR is coming from a fork (pull_request_target), ensure it's opened by "dependabot[bot]".
+    # Otherwise, clone it normally.
+    if: |
+      (github.event_name == 'pull_request_target' && github.actor == 'dependabot[bot]') ||
+      (github.event_name != 'pull_request_target' && github.actor != 'dependabot[bot]')
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout
+        if: ${{ github.event_name != 'pull_request_target' }}
+        uses: actions/checkout@v2
+      - name: Checkout PR
+        if: ${{ github.event_name == 'pull_request_target' }}
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
       - uses: mbrobbel/rustfmt-check@master
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
   clippy:
     runs-on: ubuntu-latest
+    # If the PR is coming from a fork (pull_request_target), ensure it's opened by "dependabot[bot]".
+    # Otherwise, clone it normally.
+    if: |
+      (github.event_name == 'pull_request_target' && github.actor == 'dependabot[bot]') ||
+      (github.event_name != 'pull_request_target' && github.actor != 'dependabot[bot]')
     steps:
-      - uses: actions/checkout@v2
-      - uses: Swatinem/rust-cache@v1
+      - name: Checkout
+        if: ${{ github.event_name != 'pull_request_target' }}
+        uses: actions/checkout@v2
+      - name: Checkout PR
+        if: ${{ github.event_name == 'pull_request_target' }}
+        uses: actions/checkout@v2
         with:
-          key: nightly
+          ref: ${{ github.event.pull_request.head.sha }}
       - uses: actions-rs/toolchain@v1.0.7
         with:
-          toolchain: nightly
-          components: clippy
+          toolchain: stable
           override: true
+          components: clippy
+      - run: rustup component add clippy
+      - uses: Swatinem/rust-cache@v1
       - uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           args: --all-targets --all-features
-  security:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: Swatinem/rust-cache@v1
-      - uses: actions-rs/audit-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}

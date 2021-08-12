@@ -63,7 +63,7 @@ impl DataDogExporter {
             .get_handles()
             .iter()
             .map(|((kind, key), (_, handle))| {
-                DataDogMetric::from_metric(&kind, &key, &handle, &self.tags)
+                DataDogMetric::from_metric(kind, key, handle, &self.tags)
             })
             .collect()
     }

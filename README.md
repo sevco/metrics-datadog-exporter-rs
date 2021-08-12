@@ -43,7 +43,7 @@ async fn main() {
 }
 ```
 
-### Writing on as schedule
+### Writing on a schedule
 ```rust
 use once_cell::sync::Lazy;
 
