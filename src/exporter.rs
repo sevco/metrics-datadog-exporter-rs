@@ -71,7 +71,7 @@ impl DataDogExporter {
     /// Flush metrics
     pub async fn flush(&self) -> Result<()> {
         let metrics: Vec<DataDogMetric> = self.collect();
-        log::debug!("Flushing {} metrics", metrics.len());
+        log::info!("Flushing {} metrics", metrics.len());
 
         if self.write_to_stdout {
             for metric in &metrics {
