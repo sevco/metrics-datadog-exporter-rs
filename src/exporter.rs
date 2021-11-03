@@ -144,14 +144,10 @@ impl Drop for DataDogExporter {
         if self.write_to_api {
             let host = self.api_host.to_string();
             let api_key = self.api_key.as_ref().unwrap().to_string();
-            match tokio::runtime::Handle::try_current() {
-                Ok(h) => {
-                    h.spawn_blocking(|| send(host, api_key, metrics));
-                }
-                Err(_) => {
-                    send(host, api_key, metrics);
-                }
-            }
+            // reqwest::blocking can't run in existing runtime
+            std::thread::spawn(move || send(host, api_key, metrics))
+                .join()
+                .expect("Failed to join flush thread in drop");
         }
     }
 }
