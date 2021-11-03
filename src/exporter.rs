@@ -1,14 +1,25 @@
-use crate::data::{DataDogApiPost, DataDogMetric, DataDogSeries};
-use crate::{Error, Result};
+use std::sync::Arc;
+use std::time::Duration;
+
 use log::error;
 use metrics::{Key, Label};
 use metrics_util::{Handle, NotTracked, Registry};
 use reqwest::{Client, Response};
-use std::sync::Arc;
-use std::time::Duration;
 use tokio::spawn;
 use tokio::task::JoinHandle;
 use tokio_schedule::{every, Job};
+
+use crate::data::{DataDogApiPost, DataDogMetric, DataDogSeries};
+use crate::{Error, Result};
+
+fn metric_body(metrics: &[DataDogMetric]) -> DataDogApiPost {
+    DataDogApiPost {
+        series: metrics
+            .iter()
+            .map(|m| m.into())
+            .collect::<Vec<DataDogSeries>>(),
+    }
+}
 
 /// Metric exporter
 pub struct DataDogExporter {
@@ -74,9 +85,7 @@ impl DataDogExporter {
         log::debug!("Flushing {} metrics", metrics.len());
 
         if self.write_to_stdout {
-            for metric in &metrics {
-                self.write_to_stdout(metric)?;
-            }
+            self.write_to_stdout(metrics.as_slice())?;
         }
 
         if self.write_to_api {
@@ -86,29 +95,63 @@ impl DataDogExporter {
         Ok(())
     }
 
-    fn write_to_stdout(&self, metric: &DataDogMetric) -> Result<()> {
-        for m in metric.to_metric_lines() {
-            println!("{}", serde_json::to_string(&m)?)
+    fn write_to_stdout(&self, metrics: &[DataDogMetric]) -> Result<()> {
+        for metric in metrics {
+            for m in metric.to_metric_lines() {
+                println!("{}", serde_json::to_string(&m)?)
+            }
         }
         Ok(())
     }
 
     async fn write_to_api(&self, metrics: &[DataDogMetric]) -> Result<Response, Error> {
-        let body = &DataDogApiPost {
-            series: metrics
-                .iter()
-                .map(|m| m.into())
-                .collect::<Vec<DataDogSeries>>(),
-        };
+        let body = metric_body(metrics);
         self.api_client
             .as_ref()
             .unwrap()
             .post(format!("{}/series", self.api_host))
-            .header("DD-API-KEY", self.api_key.as_ref().unwrap())
+            .header("DD-API-KEY", self.api_key.as_ref().unwrap().to_owned())
             .json(&body)
             .send()
             .await?
             .error_for_status()
             .map_err(crate::Error::from)
+    }
+}
+
+impl Drop for DataDogExporter {
+    fn drop(&mut self) {
+        fn send(host: String, key: String, metrics: Vec<DataDogMetric>) {
+            let body = metric_body(metrics.as_slice());
+            let client = reqwest::blocking::Client::new();
+            let response = client
+                .post(format!("{}/series", host))
+                .header("DD-API-KEY", key)
+                .json(&body)
+                .send();
+            if let Err(e) = response {
+                eprintln!("Failed to flush metrics {}", e)
+            }
+        }
+
+        let metrics = self.collect();
+        if self.write_to_stdout {
+            if let Err(e) = self.write_to_stdout(metrics.as_slice()) {
+                eprintln!("Failed to flush to stdout: {}", e)
+            };
+        }
+
+        if self.write_to_api {
+            let host = self.api_host.to_string();
+            let api_key = self.api_key.as_ref().unwrap().to_string();
+            match tokio::runtime::Handle::try_current() {
+                Ok(h) => {
+                    h.spawn_blocking(|| send(host, api_key, metrics));
+                }
+                Err(_) => {
+                    send(host, api_key, metrics);
+                }
+            }
+        }
     }
 }

@@ -2,7 +2,7 @@
 name = "metrics-datadog-exporter"
 version = "0.1.4-alpha.0"
 authors = ["Aaron Griffin <aaron@sevco.io"]
-edition = "2018"
+edition = "2021"
 
 license = "MIT"
 description = "A metrics-compatible exporter that sends metrics to DataDog"
@@ -21,8 +21,8 @@ serde = { version = "^1.0", features = ["derive"] }
 serde_json = "^1.0"
 serde_with = "^1.9"
 chrono = "^0.4"
-reqwest = { version = "^0.11", features = ["json"] }
-tokio = { version = "^1.5", features = ["macros"] }
+reqwest = { version = "^0.11", features = ["json", "blocking"] }
+tokio = { version = "^1.12", features = ["macros"] }
 tokio_schedule = "^0.3"
 log = "^0.4"
 

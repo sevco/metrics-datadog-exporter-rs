@@ -22,4 +22,4 @@ jobs:
         with:
           token: '${{ secrets.GITHUB_TOKEN }}'
       - name: Release
-        run: cargo release -v --no-confirm --token ${{ secrets.CRATES_IO_TOKEN }}
+        run: cargo release -x -v --dev-version --no-confirm --token ${{ secrets.CRATES_IO_TOKEN }}
