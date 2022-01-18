@@ -1,8 +1,12 @@
 //! Data model
 //!
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+
 use chrono::Utc;
+use itertools::Itertools;
 use metrics::{Key, Label};
-use metrics_util::{Handle, MetricKind};
+use metrics_util::AtomicBucket;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
@@ -48,41 +52,47 @@ pub struct DataDogMetric {
 }
 
 impl DataDogMetric {
-    pub(crate) fn from_metric(
-        kind: &MetricKind,
-        key: &Key,
-        handle: &Handle,
+    pub(crate) fn from_counter(
+        key: Key,
+        values: Vec<Arc<AtomicU64>>,
         global_tags: &[Label],
     ) -> Self {
-        match kind {
-            MetricKind::Counter => DataDogMetric::from_metric_value(
-                DataDogMetricType::Count,
-                key,
-                vec![DataDogMetricValue::Int(handle.read_counter())],
-                global_tags,
-            ),
-            MetricKind::Gauge => DataDogMetric::from_metric_value(
-                DataDogMetricType::Gauge,
-                key,
-                vec![DataDogMetricValue::Float(handle.read_gauge())],
-                global_tags,
-            ),
-            MetricKind::Histogram => {
-                let mut values = vec![];
-                handle.read_histogram_with_clear(|v| values.extend_from_slice(v));
-                DataDogMetric::from_metric_value(
-                    DataDogMetricType::Histogram,
-                    key,
-                    values.into_iter().map(DataDogMetricValue::Float).collect(),
-                    global_tags,
-                )
-            }
-        }
+        let values = values
+            .into_iter()
+            .map(|value| {
+                let u = value.load(Ordering::Acquire);
+                DataDogMetricValue::Int(u)
+            })
+            .collect_vec();
+        DataDogMetric::from_metric_value(DataDogMetricType::Count, key, values, global_tags)
+    }
+
+    pub(crate) fn from_gauge(key: Key, values: Vec<Arc<AtomicU64>>, global_tags: &[Label]) -> Self {
+        let values = values
+            .into_iter()
+            .map(|value| {
+                let u = f64::from_bits(value.load(Ordering::Acquire));
+                DataDogMetricValue::Float(u)
+            })
+            .collect_vec();
+        DataDogMetric::from_metric_value(DataDogMetricType::Gauge, key, values, global_tags)
+    }
+
+    pub(crate) fn from_histogram(
+        key: Key,
+        values: Vec<Arc<AtomicBucket<f64>>>,
+        global_tags: &[Label],
+    ) -> Self {
+        let values = values
+            .into_iter()
+            .flat_map(|value| value.data().into_iter().map(DataDogMetricValue::Float))
+            .collect_vec();
+        DataDogMetric::from_metric_value(DataDogMetricType::Histogram, key, values, global_tags)
     }
 
     fn from_metric_value(
         metric_type: DataDogMetricType,
-        key: &Key,
+        key: Key,
         values: Vec<DataDogMetricValue>,
         global_tags: &[Label],
     ) -> Self {

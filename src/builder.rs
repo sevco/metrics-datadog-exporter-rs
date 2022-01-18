@@ -1,10 +1,12 @@
+use std::sync::Arc;
+
+use metrics::Label;
+use metrics_util::Registry;
+use reqwest::Client;
+
 use crate::exporter::DataDogExporter;
 use crate::recorder::DataDogRecorder;
 use crate::DataDogHandle;
-use metrics::{Key, Label};
-use metrics_util::{Handle, NotTracked, Registry};
-use reqwest::Client;
-use std::sync::Arc;
 
 /// Builder for creating/installing a DataDog recorder/exporter
 pub struct DataDogBuilder {
@@ -28,6 +30,7 @@ impl DataDogBuilder {
     }
 
     /// Write metrics to stdout in DataDog JSON format
+    #[must_use]
     pub fn write_to_stdout(self, b: bool) -> DataDogBuilder {
         DataDogBuilder {
             write_to_stdout: b,
@@ -36,6 +39,7 @@ impl DataDogBuilder {
     }
 
     /// Write metrics to DataDog API
+    #[must_use]
     pub fn write_to_api(self, b: bool, api_key: Option<String>) -> DataDogBuilder {
         DataDogBuilder {
             write_to_api: b,
@@ -45,11 +49,13 @@ impl DataDogBuilder {
     }
 
     /// Set DataDog API host
+    #[must_use]
     pub fn api_host(self, api_host: String) -> DataDogBuilder {
         DataDogBuilder { api_host, ..self }
     }
 
     /// Set tags to send with metrics
+    #[must_use]
     pub fn tags(self, tags: Vec<(String, String)>) -> DataDogBuilder {
         DataDogBuilder {
             tags: tags.iter().map(Label::from).collect(),
@@ -59,7 +65,7 @@ impl DataDogBuilder {
 
     /// Build [`DataDogHandle`]
     pub fn build(&self) -> DataDogHandle {
-        let registry = Arc::new(Registry::<Key, Handle, NotTracked<Handle>>::untracked());
+        let registry = Arc::new(Registry::new());
         let recorder = DataDogRecorder::new(registry.clone());
         let handle = DataDogExporter::new(
             registry,

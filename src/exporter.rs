@@ -1,9 +1,10 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use itertools::Itertools;
 use log::error;
-use metrics::{Key, Label};
-use metrics_util::{Handle, NotTracked, Registry};
+use metrics::Label;
+use metrics_util::Registry;
 use reqwest::{Client, Response};
 use tokio::spawn;
 use tokio::task::JoinHandle;
@@ -23,7 +24,7 @@ fn metric_body(metrics: &[DataDogMetric]) -> DataDogApiPost {
 
 /// Metric exporter
 pub struct DataDogExporter {
-    registry: Arc<Registry<Key, Handle, NotTracked<Handle>>>,
+    registry: Arc<Registry>,
     write_to_stdout: bool,
     write_to_api: bool,
     api_host: String,
@@ -34,7 +35,7 @@ pub struct DataDogExporter {
 
 impl DataDogExporter {
     pub(crate) fn new(
-        registry: Arc<Registry<Key, Handle, NotTracked<Handle>>>,
+        registry: Arc<Registry>,
         write_to_stdout: bool,
         write_to_api: bool,
         api_host: String,
@@ -70,13 +71,58 @@ impl DataDogExporter {
     ///
     /// Note: This will clear histogram observations    
     pub fn collect(&self) -> Vec<DataDogMetric> {
-        self.registry
-            .get_handles()
-            .iter()
-            .map(|((kind, key), (_, handle))| {
-                DataDogMetric::from_metric(kind, key, handle, &self.tags)
+        let counters = self
+            .registry
+            .get_counter_handles()
+            .into_iter()
+            .group_by(|(k, _)| k.clone())
+            .into_iter()
+            .map(|(key, values)| {
+                DataDogMetric::from_counter(
+                    key,
+                    values.into_iter().map(|(_, v)| v).collect_vec(),
+                    &self.tags,
+                )
             })
-            .collect()
+            .collect_vec();
+
+        let gauges = self
+            .registry
+            .get_gauge_handles()
+            .into_iter()
+            .group_by(|(k, _)| k.clone())
+            .into_iter()
+            .map(|(key, values)| {
+                DataDogMetric::from_gauge(
+                    key,
+                    values.into_iter().map(|(_, v)| v).collect_vec(),
+                    &self.tags,
+                )
+            })
+            .collect_vec();
+
+        let histograms = self
+            .registry
+            .get_histogram_handles()
+            .into_iter()
+            .group_by(|(k, _)| k.clone())
+            .into_iter()
+            .map(|(key, values)| {
+                DataDogMetric::from_histogram(
+                    key,
+                    values.into_iter().map(|(_, v)| v).collect_vec(),
+                    &self.tags,
+                )
+            })
+            .collect_vec();
+
+        self.registry.clear();
+
+        counters
+            .into_iter()
+            .chain(gauges.into_iter())
+            .chain(histograms.into_iter())
+            .collect_vec()
     }
 
     /// Flush metrics
