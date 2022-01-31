@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use itertools::Itertools;
-use log::error;
+use log::{debug, error};
 use metrics::Label;
 use metrics_util::Registry;
 use reqwest::{Client, Response};
@@ -152,6 +152,10 @@ impl DataDogExporter {
 
     async fn write_to_api(&self, metrics: &[DataDogMetric]) -> Result<Response, Error> {
         let body = metric_body(metrics);
+        debug!(
+            "Posting to datadog: {}",
+            serde_json::to_string_pretty(&body).unwrap()
+        );
         self.api_client
             .as_ref()
             .unwrap()
@@ -169,6 +173,10 @@ impl Drop for DataDogExporter {
     fn drop(&mut self) {
         fn send(host: String, key: String, metrics: Vec<DataDogMetric>) {
             let body = metric_body(metrics.as_slice());
+            debug!(
+                "Posting to datadog: {}",
+                serde_json::to_string_pretty(&body).unwrap()
+            );
             let client = reqwest::blocking::Client::new();
             let response = client
                 .post(format!("{}/series", host))
