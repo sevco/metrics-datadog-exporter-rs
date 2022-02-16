@@ -1,6 +1,6 @@
 [package]
 name = "metrics-datadog-exporter"
-version = "0.1.10"
+version = "0.1.11-alpha.0"
 authors = ["Aaron Griffin <aaron@sevco.io"]
 edition = "2021"
 
