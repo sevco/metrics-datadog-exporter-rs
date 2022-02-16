@@ -1,8 +1,8 @@
 use anyhow::Result;
 use log::LevelFilter;
+use metrics::{counter, gauge, histogram};
 use metrics_datadog_exporter::DataDogBuilder;
 use metrics_datadog_exporter::DataDogExporter;
-use metrics_macros::{counter, gauge, histogram};
 use once_cell::sync::Lazy;
 use std::ops::Deref;
 use std::time::Duration;

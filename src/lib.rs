@@ -13,6 +13,7 @@ mod data;
 pub use crate::data::DataDogMetric;
 pub use crate::data::DataDogMetricType;
 pub use crate::data::DataDogMetricValue;
+pub use metrics;
 mod exporter;
 pub use crate::exporter::DataDogExporter;
 mod recorder;

@@ -1,8 +1,8 @@
 use anyhow::Result;
+use metrics::{counter, gauge, histogram};
 use metrics_datadog_exporter::{
     DataDogBuilder, DataDogMetric, DataDogMetricType, DataDogMetricValue,
 };
-use metrics_macros::{counter, gauge, histogram};
 use std::collections::HashMap;
 
 #[test]
