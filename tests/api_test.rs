@@ -1,8 +1,8 @@
 use anyhow::Result;
 use httpmock::Method::POST;
 use httpmock::MockServer;
+use metrics::counter;
 use metrics_datadog_exporter::DataDogBuilder;
-use metrics_macros::counter;
 
 #[tokio::test]
 async fn write_to_api_test() -> Result<()> {
