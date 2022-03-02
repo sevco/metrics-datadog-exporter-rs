@@ -19,10 +19,10 @@ jobs:
     steps:
       - name: Checkout
         if: ${{ github.event_name != 'pull_request_target' }}
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Checkout PR
         if: ${{ github.event_name == 'pull_request_target' }}
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           ref: ${{ github.event.pull_request.head.sha }}
       - uses: actions-rs/toolchain@v1.0.7
@@ -37,7 +37,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Install nightly toolchain
         uses: actions-rs/toolchain@v1.0.7
         with:
@@ -58,10 +58,10 @@ jobs:
     steps:
       - name: Checkout
         if: ${{ github.event_name != 'pull_request_target' }}
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Checkout PR
         if: ${{ github.event_name == 'pull_request_target' }}
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           ref: ${{ github.event.pull_request.head.sha }}
       - uses: mbrobbel/rustfmt-check@master
@@ -77,10 +77,10 @@ jobs:
     steps:
       - name: Checkout
         if: ${{ github.event_name != 'pull_request_target' }}
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Checkout PR
         if: ${{ github.event_name == 'pull_request_target' }}
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           ref: ${{ github.event.pull_request.head.sha }}
       - uses: actions-rs/toolchain@v1.0.7
