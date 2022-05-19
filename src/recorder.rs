@@ -1,15 +1,15 @@
 use std::sync::Arc;
 
 use metrics::{Counter, Gauge, Histogram, Key, KeyName, Recorder, Unit};
-use metrics_util::Registry;
+use metrics_util::registry::{AtomicStorage, Registry};
 
 /// Metric recorder
 pub struct DataDogRecorder {
-    registry: Arc<Registry>,
+    registry: Arc<Registry<Key, AtomicStorage>>,
 }
 
 impl DataDogRecorder {
-    pub(crate) fn new(registry: Arc<Registry>) -> Self {
+    pub(crate) fn new(registry: Arc<Registry<Key, AtomicStorage>>) -> Self {
         DataDogRecorder { registry }
     }
 }

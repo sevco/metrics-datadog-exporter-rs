@@ -136,7 +136,13 @@ pub struct DataDogMetricLine {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DataDogApiPost {
-    pub series: Vec<DataDogSeries>,
+    pub series: Vec<String>,
+}
+
+impl DataDogApiPost {
+    pub fn json(&self) -> String {
+        format!("{{ \"series\": [ {} ] }}", self.series.join(","))
+    }
 }
 
 #[skip_serializing_none]
@@ -151,15 +157,15 @@ pub struct DataDogSeries {
     pub metric_type: DataDogMetricType,
 }
 
-impl From<&DataDogMetric> for DataDogSeries {
-    fn from(m: &DataDogMetric) -> Self {
+impl From<DataDogMetric> for DataDogSeries {
+    fn from(m: DataDogMetric) -> Self {
         DataDogSeries {
             host: LAMBDA_HOSTNAME.to_string(),
             interval: None,
-            metric: m.metric_name.clone(),
-            points: m.points.iter().map(|v| (m.timestamp, v.clone())).collect(),
-            tags: m.tags.clone(),
-            metric_type: m.metric_type.clone(),
+            metric: m.metric_name,
+            points: m.points.into_iter().map(|v| (m.timestamp, v)).collect(),
+            tags: m.tags,
+            metric_type: m.metric_type,
         }
     }
 }

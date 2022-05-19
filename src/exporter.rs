@@ -3,9 +3,9 @@ use std::time::Duration;
 
 use itertools::Itertools;
 use log::{debug, error};
-use metrics::Label;
-use metrics_util::Registry;
-use reqwest::{Client, Response};
+use metrics::{Key, Label};
+use metrics_util::registry::{AtomicStorage, Registry};
+use reqwest::Client;
 use tokio::spawn;
 use tokio::task::JoinHandle;
 use tokio_schedule::{every, Job};
@@ -13,18 +13,36 @@ use tokio_schedule::{every, Job};
 use crate::data::{DataDogApiPost, DataDogMetric, DataDogSeries};
 use crate::{Error, Result};
 
-fn metric_body(metrics: &[DataDogMetric]) -> DataDogApiPost {
-    DataDogApiPost {
-        series: metrics
-            .iter()
-            .map(|m| m.into())
-            .collect::<Vec<DataDogSeries>>(),
+const MAX_BODY_BYTES: usize = 512000;
+const CHUNK_BODY_BYTES: usize = ((MAX_BODY_BYTES as f32) * 0.75) as usize;
+
+fn metric_requests(metrics: Vec<DataDogMetric>) -> Result<Vec<DataDogApiPost>> {
+    let mut series: Vec<Vec<String>> = vec![];
+    let mut current_series: Vec<String> = vec![];
+    let mut current_series_size = 0;
+
+    for metric in metrics {
+        let serialized = serde_json::to_string(&DataDogSeries::from(metric))?;
+        current_series_size += serialized.len();
+        current_series.push(serialized);
+
+        if current_series_size > CHUNK_BODY_BYTES {
+            series.push(current_series);
+            current_series = vec![];
+            current_series_size = 0;
+        }
     }
+    series.push(current_series);
+
+    Ok(series
+        .into_iter()
+        .map(|s| DataDogApiPost { series: s })
+        .collect_vec())
 }
 
 /// Metric exporter
 pub struct DataDogExporter {
-    registry: Arc<Registry>,
+    registry: Arc<Registry<Key, AtomicStorage>>,
     write_to_stdout: bool,
     write_to_api: bool,
     api_host: String,
@@ -35,7 +53,7 @@ pub struct DataDogExporter {
 
 impl DataDogExporter {
     pub(crate) fn new(
-        registry: Arc<Registry>,
+        registry: Arc<Registry<Key, AtomicStorage>>,
         write_to_stdout: bool,
         write_to_api: bool,
         api_host: String,
@@ -135,7 +153,7 @@ impl DataDogExporter {
         }
 
         if self.write_to_api {
-            self.write_to_api(&metrics).await?;
+            self.write_to_api(metrics).await?;
         }
 
         Ok(())
@@ -150,41 +168,45 @@ impl DataDogExporter {
         Ok(())
     }
 
-    async fn write_to_api(&self, metrics: &[DataDogMetric]) -> Result<Response, Error> {
-        let body = metric_body(metrics);
-        debug!(
-            "Posting to datadog: {}",
-            serde_json::to_string_pretty(&body).unwrap()
-        );
-        self.api_client
-            .as_ref()
-            .unwrap()
-            .post(format!("{}/series", self.api_host))
-            .header("DD-API-KEY", self.api_key.as_ref().unwrap().to_owned())
-            .json(&body)
-            .send()
-            .await?
-            .error_for_status()
-            .map_err(crate::Error::from)
+    async fn write_to_api(&self, metrics: Vec<DataDogMetric>) -> Result<(), Error> {
+        let requests = metric_requests(metrics)?;
+        for request in requests {
+            debug!(
+                "Posting to datadog: {}",
+                serde_json::to_string_pretty(&request).unwrap()
+            );
+            self.api_client
+                .as_ref()
+                .unwrap()
+                .post(format!("{}/series", self.api_host))
+                .header("DD-API-KEY", self.api_key.as_ref().unwrap().to_owned())
+                .body(request.json())
+                .send()
+                .await?
+                .error_for_status()?;
+        }
+        Ok(())
     }
 }
 
 impl Drop for DataDogExporter {
     fn drop(&mut self) {
         fn send(host: String, key: String, metrics: Vec<DataDogMetric>) {
-            let body = metric_body(metrics.as_slice());
-            debug!(
-                "Posting to datadog: {}",
-                serde_json::to_string_pretty(&body).unwrap()
-            );
-            let client = reqwest::blocking::Client::new();
-            let response = client
-                .post(format!("{}/series", host))
-                .header("DD-API-KEY", key)
-                .json(&body)
-                .send();
-            if let Err(e) = response {
-                eprintln!("Failed to flush metrics {}", e)
+            let requests = metric_requests(metrics).unwrap();
+            for request in requests {
+                debug!(
+                    "Posting to datadog: {}",
+                    serde_json::to_string_pretty(&request).unwrap()
+                );
+                let client = reqwest::blocking::Client::new();
+                let response = client
+                    .post(format!("{}/series", host))
+                    .header("DD-API-KEY", key.to_string())
+                    .json(&request)
+                    .send();
+                if let Err(e) = response {
+                    eprintln!("Failed to flush metrics {}", e)
+                }
             }
         }
 
