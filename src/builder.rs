@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use metrics::Label;
-use metrics_util::Registry;
+use metrics_util::registry::{AtomicStorage, Registry};
 use reqwest::Client;
 
 use crate::exporter::DataDogExporter;
@@ -65,7 +65,7 @@ impl DataDogBuilder {
 
     /// Build [`DataDogHandle`]
     pub fn build(&self) -> DataDogHandle {
-        let registry = Arc::new(Registry::new());
+        let registry = Arc::new(Registry::new(AtomicStorage));
         let recorder = DataDogRecorder::new(registry.clone());
         let handle = DataDogExporter::new(
             registry,
