@@ -14,7 +14,7 @@ readme = "README.md"
 
 [dependencies]
 metrics = "^0.18"
-metrics-util = "^0.12"
+metrics-util = "^0.14"
 parking_lot = "^0.12"
 thiserror = "^1.0"
 serde = { version = "^1.0", features = ["derive"] }
