@@ -16,7 +16,7 @@ use tokio_schedule::{every, Job};
 use crate::data::{DataDogApiPost, DataDogMetric, DataDogSeries};
 use crate::{Error, Result};
 
-const MAX_BODY_BYTES: usize = 512000;
+const MAX_BODY_BYTES: usize = 62914560;
 const CHUNK_BODY_BYTES: usize = ((MAX_BODY_BYTES as f32) * 0.75) as usize;
 
 fn metric_requests(metrics: Vec<DataDogMetric>) -> Result<Vec<DataDogApiPost>> {
@@ -33,7 +33,7 @@ fn metric_requests(metrics: Vec<DataDogMetric>) -> Result<Vec<DataDogApiPost>> {
             series.push(current_series);
             current_series = vec![];
             current_series_size = 0;
-        }
+        };
     }
     series.push(current_series);
 
@@ -178,7 +178,7 @@ impl DataDogExporter {
         );
         let mut e = flate2::write::GzEncoder::new(Vec::new(), Compression::default());
 
-        e.write_all(serde_json::to_vec(&request)?.as_slice())?;
+        e.write_all(request.json().as_bytes())?;
 
         self.api_client
             .as_ref()
