@@ -1,7 +1,10 @@
+use flate2::Compression;
+use futures::future::try_join_all;
+use itertools::Itertools;
+use std::io::Write;
 use std::sync::Arc;
 use std::time::Duration;
 
-use itertools::Itertools;
 use log::{debug, error};
 use metrics::{Key, Label};
 use metrics_util::registry::{AtomicStorage, Registry};
@@ -79,7 +82,7 @@ impl DataDogExporter {
             .perform(move || async move {
                 let result = self.flush().await;
                 if let Err(e) = result {
-                    error!("Failed to flush metrics: {}", e);
+                    error!("Failed to flush metrics: {:?}", e);
                 }
             });
         spawn(every)
@@ -146,7 +149,7 @@ impl DataDogExporter {
     /// Flush metrics
     pub async fn flush(&self) -> Result<()> {
         let metrics: Vec<DataDogMetric> = self.collect();
-        log::debug!("Flushing {} metrics", metrics.len());
+        debug!("Flushing {} metrics", metrics.len());
 
         if self.write_to_stdout {
             self.write_to_stdout(metrics.as_slice())?;
@@ -168,23 +171,39 @@ impl DataDogExporter {
         Ok(())
     }
 
+    async fn send_request(&self, request: DataDogApiPost) -> Result<(), Error> {
+        debug!(
+            "Posting to datadog: {}",
+            serde_json::to_string_pretty(&request).unwrap()
+        );
+        let mut e = flate2::write::GzEncoder::new(Vec::new(), Compression::default());
+
+        e.write_all(serde_json::to_vec(&request)?.as_slice())?;
+
+        self.api_client
+            .as_ref()
+            .unwrap()
+            .post(format!("{}/series", self.api_host))
+            .header("DD-API-KEY", self.api_key.as_ref().unwrap().to_owned())
+            .header("Content-Type", "application/json")
+            .header("Content-Encoding", "gzip")
+            .body(e.finish()?)
+            .send()
+            .await?
+            .error_for_status()?;
+
+        Ok(())
+    }
+
     async fn write_to_api(&self, metrics: Vec<DataDogMetric>) -> Result<(), Error> {
         let requests = metric_requests(metrics)?;
-        for request in requests {
-            debug!(
-                "Posting to datadog: {}",
-                serde_json::to_string_pretty(&request).unwrap()
-            );
-            self.api_client
-                .as_ref()
-                .unwrap()
-                .post(format!("{}/series", self.api_host))
-                .header("DD-API-KEY", self.api_key.as_ref().unwrap().to_owned())
-                .body(request.json())
-                .send()
-                .await?
-                .error_for_status()?;
-        }
+        try_join_all(
+            requests
+                .into_iter()
+                .map(|request| self.send_request(request)),
+        )
+        .await?;
+
         Ok(())
     }
 }
@@ -213,7 +232,7 @@ impl Drop for DataDogExporter {
         let metrics = self.collect();
         if self.write_to_stdout {
             if let Err(e) = self.write_to_stdout(metrics.as_slice()) {
-                eprintln!("Failed to flush to stdout: {}", e)
+                eprintln!("Failed to flush to stdout: {:?}", e)
             };
         }
 

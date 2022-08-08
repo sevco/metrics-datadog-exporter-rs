@@ -1,14 +1,14 @@
 //! Data model
 //!
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
-
 use chrono::Utc;
 use itertools::Itertools;
 use metrics::{Key, Label};
 use metrics_util::AtomicBucket;
+use portable_atomic::AtomicU64;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
 
 static LAMBDA_HOSTNAME: &str = "lambda";
 

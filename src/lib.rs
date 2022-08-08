@@ -3,6 +3,7 @@
 //! Exports any metrics to DataDog
 
 use metrics::SetRecorderError;
+use std::io;
 use std::time::Duration;
 use thiserror::Error;
 use tokio::task::JoinHandle;
@@ -14,6 +15,7 @@ pub use crate::data::DataDogMetric;
 pub use crate::data::DataDogMetricType;
 pub use crate::data::DataDogMetricValue;
 pub use metrics;
+
 mod exporter;
 pub use crate::exporter::DataDogExporter;
 mod recorder;
@@ -28,6 +30,9 @@ pub enum Error {
     /// Error when interacting with DataDog API
     #[error("API Request Failed: `{0}`")]
     ApiError(#[from] reqwest::Error),
+    /// Error when compressing request body
+    #[error("Error compressing body: `{0}`")]
+    IoError(#[from] io::Error),
 }
 
 /// [`Ok`] or [`enum@Error`]

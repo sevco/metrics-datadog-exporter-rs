@@ -1,8 +1,13 @@
+extern crate core;
+
 use anyhow::Result;
+use assert_json_diff::{CompareMode, Config};
 use httpmock::Method::POST;
 use httpmock::MockServer;
 use metrics::counter;
 use metrics_datadog_exporter::DataDogBuilder;
+use serde_json::{json, Value};
+use std::io::Read;
 
 #[tokio::test]
 async fn write_to_api_test() -> Result<()> {
@@ -17,19 +22,26 @@ async fn write_to_api_test() -> Result<()> {
 
     counter!("metric", 1);
     let mock = server.mock(|when, then| {
-        when.method(POST).path("/series").json_body_partial(
-            r#"
-            {
-                "series": [
-                    {
-                        "host": "lambda",
-                        "metric": "metric",
-                        "type": "count"
-                    }
-                ]
-            }
-            "#,
-        );
+        when.method(POST)
+            .path("/series")
+            .header("Content-Type", "application/json")
+            .header("Content-Encoding", "gzip")
+            .matches(|req| {
+                let body = req.body.clone().unwrap();
+                let mut gz = flate2::read::GzDecoder::new(body.as_slice());
+                let mut buffer = Vec::new();
+                gz.read_to_end(&mut buffer).expect("");
+
+                let j: Value = serde_json::from_slice(buffer.as_slice()).expect("");
+                let expected =
+                    json!({"series":[{"host":"lambda","metric":"metric","type":"count"}]});
+                assert_json_diff::assert_json_matches!(
+                    j,
+                    expected,
+                    Config::new(CompareMode::Inclusive)
+                );
+                true
+            });
         then.status(200);
     });
 
