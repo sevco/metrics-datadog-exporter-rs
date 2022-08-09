@@ -16,7 +16,7 @@ use tokio_schedule::{every, Job};
 use crate::data::{DataDogApiPost, DataDogMetric, DataDogSeries};
 use crate::{Error, Result};
 
-const MAX_BODY_BYTES: usize = 62914560;
+const MAX_BODY_BYTES: usize = 5242880;
 const CHUNK_BODY_BYTES: usize = ((MAX_BODY_BYTES as f32) * 0.75) as usize;
 
 fn metric_requests(metrics: Vec<DataDogMetric>) -> Result<Vec<DataDogApiPost>> {

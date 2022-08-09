@@ -33,8 +33,7 @@ async fn write_to_api_test() -> Result<()> {
                 gz.read_to_end(&mut buffer).expect("");
 
                 let j: Value = serde_json::from_slice(buffer.as_slice()).expect("");
-                let expected =
-                    json!({"series":[{"host":"lambda","metric":"metric","type":"count"}]});
+                let expected = json!({"series":[{"resources":[{"type": "host", "name": "lambda"}],"metric":"metric","type":1}]});
                 assert_json_diff::assert_json_matches!(
                     j,
                     expected,

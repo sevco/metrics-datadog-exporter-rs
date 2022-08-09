@@ -29,6 +29,7 @@ log = "^0.4"
 itertools = "^0.10"
 portable-atomic = "0.3.10"
 futures = "0.3.21"
+serde_repr = "0.1"
 
 [dev-dependencies]
 anyhow = "^1.0"

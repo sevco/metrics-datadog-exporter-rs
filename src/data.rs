@@ -6,6 +6,7 @@ use metrics::{Key, Label};
 use metrics_util::AtomicBucket;
 use portable_atomic::AtomicU64;
 use serde::{Deserialize, Serialize};
+use serde_repr::*;
 use serde_with::skip_serializing_none;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -13,17 +14,17 @@ use std::sync::Arc;
 static LAMBDA_HOSTNAME: &str = "lambda";
 
 /// Metric type
-#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Debug, Serialize_repr, Deserialize_repr, Clone, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u8)]
 pub enum DataDogMetricType {
+    /// Unspecified
+    Unspecified = 0,
     /// Counter
-    #[serde(rename = "count")]
     Count,
     /// Gauge
-    #[serde(rename = "gauge")]
     Gauge,
-    /// Histogram
-    #[serde(rename = "histogram")]
-    Histogram,
+    /// Rate
+    Rate,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialOrd, PartialEq)]
@@ -87,7 +88,7 @@ impl DataDogMetric {
             .into_iter()
             .flat_map(|value| value.data().into_iter().map(DataDogMetricValue::Float))
             .collect_vec();
-        DataDogMetric::from_metric_value(DataDogMetricType::Histogram, key, values, global_tags)
+        DataDogMetric::from_metric_value(DataDogMetricType::Unspecified, key, values, global_tags)
     }
 
     fn from_metric_value(
@@ -145,27 +146,53 @@ impl DataDogApiPost {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DataDogSeriesResource {
+    pub name: String,
+    #[serde(rename = "type")]
+    pub resource_type: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DataDogSeriesPoint {
+    #[serde(rename = "type")]
+    pub timestamp: i64,
+    pub value: DataDogMetricValue,
+}
+
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DataDogSeries {
-    pub host: String,
     pub interval: Option<i64>,
     pub metric: String,
-    pub points: Vec<(i64, DataDogMetricValue)>,
-    pub tags: Vec<String>,
+    pub points: Vec<DataDogSeriesPoint>,
+    pub tags: Option<Vec<String>>,
     #[serde(rename = "type")]
     pub metric_type: DataDogMetricType,
+    pub resources: Option<Vec<DataDogSeriesResource>>,
+    pub unit: Option<String>,
 }
 
 impl From<DataDogMetric> for DataDogSeries {
     fn from(m: DataDogMetric) -> Self {
         DataDogSeries {
-            host: LAMBDA_HOSTNAME.to_string(),
             interval: None,
+            unit: None,
             metric: m.metric_name,
-            points: m.points.into_iter().map(|v| (m.timestamp, v)).collect(),
-            tags: m.tags,
+            points: m
+                .points
+                .into_iter()
+                .map(|v| DataDogSeriesPoint {
+                    timestamp: m.timestamp,
+                    value: v,
+                })
+                .collect_vec(),
+            tags: Some(m.tags),
             metric_type: m.metric_type,
+            resources: Some(vec![DataDogSeriesResource {
+                resource_type: "host".to_string(),
+                name: LAMBDA_HOSTNAME.to_string(),
+            }]),
         }
     }
 }

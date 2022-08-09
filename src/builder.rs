@@ -23,7 +23,7 @@ impl DataDogBuilder {
         DataDogBuilder {
             write_to_stdout: true,
             write_to_api: false,
-            api_host: "https://api.datadoghq.com/api/v1".to_string(),
+            api_host: "https://api.datadoghq.com/api/v2".to_string(),
             api_key: None,
             tags: vec![],
         }
