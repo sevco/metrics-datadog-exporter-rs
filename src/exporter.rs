@@ -35,7 +35,9 @@ fn metric_requests(metrics: Vec<DataDogMetric>) -> Result<Vec<DataDogApiPost>> {
             current_series_size = 0;
         };
     }
-    series.push(current_series);
+    if !current_series.is_empty() {
+        series.push(current_series);
+    }
 
     Ok(series
         .into_iter()
