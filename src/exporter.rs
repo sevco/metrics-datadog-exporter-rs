@@ -16,7 +16,7 @@ use tokio_schedule::{every, Job};
 use crate::data::{DataDogApiPost, DataDogMetric, DataDogSeries};
 use crate::{Error, Result};
 
-const MAX_BODY_BYTES: usize = 5242880;
+const MAX_BODY_BYTES: usize = 3200000;
 const CHUNK_BODY_BYTES: usize = ((MAX_BODY_BYTES as f32) * 0.75) as usize;
 
 fn metric_requests(metrics: Vec<DataDogMetric>) -> Result<Vec<DataDogApiPost>> {
@@ -187,6 +187,7 @@ impl DataDogExporter {
             .unwrap()
             .post(format!("{}/series", self.api_host))
             .header("DD-API-KEY", self.api_key.as_ref().unwrap().to_owned())
+            .header("Accept", "application/json")
             .header("Content-Type", "application/json")
             .header("Content-Encoding", "gzip")
             .body(e.finish()?)
