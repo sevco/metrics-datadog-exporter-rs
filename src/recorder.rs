@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use metrics::{Counter, Gauge, Histogram, Key, KeyName, Recorder, Unit};
+use metrics::{Counter, Gauge, Histogram, Key, KeyName, Recorder, SharedString, Unit};
 use metrics_util::registry::{AtomicStorage, Registry};
 
 /// Metric recorder
@@ -15,16 +15,16 @@ impl DataDogRecorder {
 }
 
 impl Recorder for DataDogRecorder {
-    fn describe_counter(&self, _: KeyName, _: Option<Unit>, _: &'static str) {
-        unreachable!("Descriptions are not supported")
+    fn describe_counter(&self, _key: KeyName, _unit: Option<Unit>, _description: SharedString) {
+        unimplemented!()
     }
 
-    fn describe_gauge(&self, _: KeyName, _: Option<Unit>, _: &'static str) {
-        unreachable!("Descriptions are not supported")
+    fn describe_gauge(&self, _key: KeyName, _unit: Option<Unit>, _description: SharedString) {
+        unimplemented!()
     }
 
-    fn describe_histogram(&self, _: KeyName, _: Option<Unit>, _: &'static str) {
-        unreachable!("Descriptions are not supported")
+    fn describe_histogram(&self, _key: KeyName, _unit: Option<Unit>, _description: SharedString) {
+        unimplemented!()
     }
 
     fn register_counter(&self, key: &Key) -> Counter {

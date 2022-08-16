@@ -7,7 +7,7 @@ use std::collections::HashMap;
 
 #[test]
 fn collect_test() -> Result<()> {
-    let metrics = DataDogBuilder::default().build().install()?;
+    let metrics = DataDogBuilder::default().build()?.install()?;
     counter!("this.counter", 123, "tag2" => "value2");
     gauge!("this.gauge", 234.0, "tag3" => "value3");
     histogram!("this.histogram", 345.0, "tag4" => "value5");
@@ -15,7 +15,7 @@ fn collect_test() -> Result<()> {
     let collected = metrics
         .collect()
         .into_iter()
-        .map(|m| (m.metric_name.to_string(), m))
+        .map(|m| (m.metric.to_string(), m))
         .collect::<HashMap<String, DataDogMetric>>();
     assert_eq!(collected.len(), 3);
     let counter = collected.get("this.counter").unwrap();

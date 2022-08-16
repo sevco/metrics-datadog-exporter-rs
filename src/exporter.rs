@@ -1,43 +1,146 @@
+//! DataDog HTTP API exporter
+
+use flate2::write::GzEncoder;
+use flate2::Compression;
+use futures::future::try_join_all;
+use std::io::Write;
 use std::sync::Arc;
 use std::time::Duration;
 
 use itertools::Itertools;
-use log::{debug, error};
+use log::{debug, error, log_enabled, Level};
 use metrics::{Key, Label};
 use metrics_util::registry::{AtomicStorage, Registry};
-use reqwest::Client;
+use reqwest::header::CONTENT_ENCODING;
+use reqwest::{blocking, Client};
 use tokio::spawn;
 use tokio::task::JoinHandle;
 use tokio_schedule::{every, Job};
 
+use crate::builder::DataDogConfig;
 use crate::data::{DataDogApiPost, DataDogMetric, DataDogSeries};
 use crate::{Error, Result};
 
-const MAX_BODY_BYTES: usize = 512000;
-const CHUNK_BODY_BYTES: usize = ((MAX_BODY_BYTES as f32) * 0.75) as usize;
+// Size constants from https://docs.datadoghq.com/api/latest/metrics/#submit-metrics
+const MAX_PAYLOAD_BYTES: usize = 3200000;
+const MAX_DECOMPRESSED_PAYLOAD: usize = 62914560;
 
-fn metric_requests(metrics: Vec<DataDogMetric>) -> Result<Vec<DataDogApiPost>> {
-    let mut series: Vec<Vec<String>> = vec![];
-    let mut current_series: Vec<String> = vec![];
-    let mut current_series_size = 0;
+fn send_blocking(
+    metrics: Vec<DataDogMetric>,
+    gzip: bool,
+    api_host: String,
+    api_key: String,
+    client: blocking::Client,
+) -> Result<(), Error> {
+    if !metrics.is_empty() {
+        let requests = metric_requests(metrics, gzip)?;
+        for request in requests {
+            let mut request = client
+                .post(format!("{}/series", api_host.to_owned()))
+                .header("DD-API-KEY", api_key.to_owned())
+                .body(request);
+            if gzip {
+                request = request.header(CONTENT_ENCODING, "gzip");
+            }
 
-    for metric in metrics {
-        let serialized = serde_json::to_string(&DataDogSeries::from(metric))?;
-        current_series_size += serialized.len();
-        current_series.push(serialized);
+            let response = request.send()?.error_for_status()?;
+            let status = response.status();
+            let message = response.text()?;
 
-        if current_series_size > CHUNK_BODY_BYTES {
-            series.push(current_series);
-            current_series = vec![];
-            current_series_size = 0;
+            if log_enabled!(Level::Debug) {
+                debug!(
+                    "Got response from DataDog API status: {}, message: {}",
+                    status, message
+                );
+            }
+        }
+    };
+    Ok(())
+}
+
+async fn send_async(
+    metrics: Vec<DataDogMetric>,
+    gzip: bool,
+    api_host: &String,
+    api_key: &String,
+    client: &Client,
+) -> Result<(), Error> {
+    if !metrics.is_empty() {
+        let requests = metric_requests(metrics, gzip)?;
+        let responses = try_join_all(requests.into_iter().map(|request| async {
+            let mut request = client
+                .post(format!("{}/series", api_host.to_owned()))
+                .header("DD-API-KEY", api_key.to_owned())
+                .body(request);
+            if gzip {
+                request = request.header(CONTENT_ENCODING, "gzip");
+            }
+            let response = request.send().await?.error_for_status()?;
+            let status = response.status();
+            let message = response.text().await?;
+            Ok::<_, reqwest::Error>((status, message))
+        }))
+        .await?;
+
+        if log_enabled!(Level::Debug) {
+            responses.into_iter().for_each(|(status, message)| {
+                debug!(
+                    "Got response from DataDog API status: {}, message: {}",
+                    status, message
+                );
+            });
+        }
+    };
+    Ok(())
+}
+
+fn metric_requests(metrics: Vec<DataDogMetric>, gzip: bool) -> Result<Vec<Vec<u8>>> {
+    let series = metrics
+        .into_iter()
+        .flat_map(DataDogSeries::new)
+        .collect_vec();
+    if gzip {
+        split_and_compress_series(&series)
+    } else {
+        split_series(&series)
+    }
+}
+
+fn split_series(series: &[DataDogSeries]) -> Result<Vec<Vec<u8>>> {
+    let body = serde_json::to_vec(&DataDogApiPost { series })?;
+    if body.len() < MAX_PAYLOAD_BYTES {
+        Ok(vec![body])
+    } else {
+        let (left, right) = series.split_at(series.len() / 2);
+        Ok(split_series(left)?
+            .into_iter()
+            .chain(split_series(right)?.into_iter())
+            .collect_vec())
+    }
+}
+
+fn split_and_compress_series(series: &[DataDogSeries]) -> Result<Vec<Vec<u8>>> {
+    fn split(series: &[DataDogSeries]) -> Result<Vec<Vec<u8>>> {
+        let (left, right) = series.split_at(series.len() / 2);
+        Ok(split_and_compress_series(left)?
+            .into_iter()
+            .chain(split_and_compress_series(right)?.into_iter())
+            .collect_vec())
+    }
+
+    let body = serde_json::to_vec(&DataDogApiPost { series })?;
+    if body.len() > MAX_DECOMPRESSED_PAYLOAD {
+        split(series)
+    } else {
+        let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+        encoder.write_all(&serde_json::to_vec(&DataDogApiPost { series })?)?;
+        let compressed = encoder.finish()?;
+        if compressed.len() < MAX_PAYLOAD_BYTES {
+            Ok(vec![compressed])
+        } else {
+            split(series)
         }
     }
-    series.push(current_series);
-
-    Ok(series
-        .into_iter()
-        .map(|s| DataDogApiPost { series: s })
-        .collect_vec())
 }
 
 /// Metric exporter
@@ -49,26 +152,24 @@ pub struct DataDogExporter {
     api_client: Option<Client>,
     api_key: Option<String>,
     tags: Vec<Label>,
+    gzip: bool,
 }
 
 impl DataDogExporter {
     pub(crate) fn new(
         registry: Arc<Registry<Key, AtomicStorage>>,
-        write_to_stdout: bool,
-        write_to_api: bool,
-        api_host: String,
-        api_client: Option<Client>,
-        api_key: Option<String>,
-        tags: Vec<Label>,
+        client: Option<Client>,
+        config: DataDogConfig,
     ) -> Self {
         DataDogExporter {
             registry,
-            write_to_stdout,
-            write_to_api,
-            api_host,
-            api_client,
-            api_key,
-            tags,
+            write_to_stdout: config.write_to_stdout,
+            write_to_api: config.write_to_api,
+            api_host: config.api_host,
+            api_client: client,
+            api_key: config.api_key,
+            tags: config.tags,
+            gzip: config.gzip,
         }
     }
 
@@ -169,47 +270,19 @@ impl DataDogExporter {
     }
 
     async fn write_to_api(&self, metrics: Vec<DataDogMetric>) -> Result<(), Error> {
-        let requests = metric_requests(metrics)?;
-        for request in requests {
-            debug!(
-                "Posting to datadog: {}",
-                serde_json::to_string_pretty(&request).unwrap()
-            );
-            self.api_client
-                .as_ref()
-                .unwrap()
-                .post(format!("{}/series", self.api_host))
-                .header("DD-API-KEY", self.api_key.as_ref().unwrap().to_owned())
-                .body(request.json())
-                .send()
-                .await?
-                .error_for_status()?;
-        }
-        Ok(())
+        send_async(
+            metrics,
+            self.gzip,
+            &self.api_host,
+            self.api_key.as_ref().unwrap(),
+            self.api_client.as_ref().unwrap(),
+        )
+        .await
     }
 }
 
 impl Drop for DataDogExporter {
     fn drop(&mut self) {
-        fn send(host: String, key: String, metrics: Vec<DataDogMetric>) {
-            let requests = metric_requests(metrics).unwrap();
-            for request in requests {
-                debug!(
-                    "Posting to datadog: {}",
-                    serde_json::to_string_pretty(&request).unwrap()
-                );
-                let client = reqwest::blocking::Client::new();
-                let response = client
-                    .post(format!("{}/series", host))
-                    .header("DD-API-KEY", key.to_string())
-                    .json(&request)
-                    .send();
-                if let Err(e) = response {
-                    eprintln!("Failed to flush metrics {}", e)
-                }
-            }
-        }
-
         let metrics = self.collect();
         if self.write_to_stdout {
             if let Err(e) = self.write_to_stdout(metrics.as_slice()) {
@@ -220,10 +293,30 @@ impl Drop for DataDogExporter {
         if self.write_to_api {
             let host = self.api_host.to_string();
             let api_key = self.api_key.as_ref().unwrap().to_string();
+            let compression = self.gzip;
             // reqwest::blocking can't run in existing runtime
-            std::thread::spawn(move || send(host, api_key, metrics))
-                .join()
-                .expect("Failed to join flush thread in drop");
+            let joined = std::thread::spawn(move || {
+                send_blocking(
+                    metrics,
+                    compression,
+                    host,
+                    api_key,
+                    blocking::Client::default(),
+                )
+            })
+            .join();
+
+            match joined {
+                Ok(r) => match r {
+                    Ok(_) => (),
+                    Err(e) => {
+                        eprintln!("Failed to flush metrics in drop: {}", e);
+                    }
+                },
+                Err(_) => {
+                    eprintln!("Failed to join flush thread in drop");
+                }
+            };
         }
     }
 }

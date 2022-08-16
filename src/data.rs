@@ -1,16 +1,15 @@
 //! Data model
 //!
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use chrono::Utc;
 use itertools::Itertools;
 use metrics::{Key, Label};
 use metrics_util::AtomicBucket;
+use portable_atomic::AtomicU64;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
-
-static LAMBDA_HOSTNAME: &str = "lambda";
 
 /// Metric type
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq, PartialOrd, Ord)]
@@ -40,7 +39,7 @@ pub enum DataDogMetricValue {
 /// DataDog formatted metric
 pub struct DataDogMetric {
     /// Metric name
-    pub metric_name: String,
+    pub metric: String,
     /// Metric type
     pub metric_type: DataDogMetricType,
     /// Metric values
@@ -97,7 +96,7 @@ impl DataDogMetric {
         global_tags: &[Label],
     ) -> Self {
         DataDogMetric {
-            metric_name: key.name().to_string(),
+            metric: key.name().to_string(),
             metric_type,
             points: values,
             timestamp: Utc::now().timestamp(),
@@ -113,7 +112,7 @@ impl DataDogMetric {
         self.points
             .iter()
             .map(|v| DataDogMetricLine {
-                metric_name: self.metric_name.to_string(),
+                name: self.metric.to_string(),
                 value: v.clone(),
                 timestamp: self.timestamp,
                 tags: self.tags.clone(),
@@ -122,50 +121,59 @@ impl DataDogMetric {
     }
 }
 
+/// StdOut representation of a metric
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DataDogMetricLine {
+    /// Metric name
     #[serde(rename = "m")]
-    pub metric_name: String,
+    pub name: String,
+    /// Metric value
     #[serde(rename = "v")]
     pub value: DataDogMetricValue,
+    /// Metric timestamp
     #[serde(rename = "e")]
     pub timestamp: i64,
+    /// Metric tags
     #[serde(rename = "t")]
     pub tags: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct DataDogApiPost {
-    pub series: Vec<String>,
+/// DataDog API Post Body
+#[derive(Debug, Serialize, Clone)]
+pub struct DataDogApiPost<'a> {
+    /// Metric series
+    pub series: &'a [DataDogSeries],
 }
 
-impl DataDogApiPost {
-    pub fn json(&self) -> String {
-        format!("{{ \"series\": [ {} ] }}", self.series.join(","))
-    }
-}
-
+/// DataDog Metric Series
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DataDogSeries {
-    pub host: String,
+    /// Metric interval
     pub interval: Option<i64>,
+    /// Metric name
     pub metric: String,
+    /// Metric time series
     pub points: Vec<(i64, DataDogMetricValue)>,
+    /// Metric tags
     pub tags: Vec<String>,
+    /// Metric type
     #[serde(rename = "type")]
     pub metric_type: DataDogMetricType,
 }
 
-impl From<DataDogMetric> for DataDogSeries {
-    fn from(m: DataDogMetric) -> Self {
-        DataDogSeries {
-            host: LAMBDA_HOSTNAME.to_string(),
-            interval: None,
-            metric: m.metric_name,
-            points: m.points.into_iter().map(|v| (m.timestamp, v)).collect(),
-            tags: m.tags,
-            metric_type: m.metric_type,
-        }
+impl DataDogSeries {
+    /// Create metric series from metric
+    pub fn new(m: DataDogMetric) -> Vec<DataDogSeries> {
+        m.points
+            .chunks(3)
+            .map(|points| DataDogSeries {
+                interval: None,
+                metric: m.metric.to_owned(),
+                points: points.iter().map(|v| (m.timestamp, v.to_owned())).collect(),
+                tags: m.tags.to_owned(),
+                metric_type: m.metric_type.to_owned(),
+            })
+            .collect_vec()
     }
 }
