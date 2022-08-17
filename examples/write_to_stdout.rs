@@ -11,7 +11,7 @@ async fn main() -> Result<()> {
     let metrics = DataDogBuilder::default()
         .tags(vec![("tag1".to_string(), "value1".to_string())])
         .write_to_stdout(true)
-        .build()
+        .build()?
         .install()?;
     counter!("this.counter", 123, "tag2" => "value2");
     gauge!("this.gauge", 234.0, "tag3" => "value3");

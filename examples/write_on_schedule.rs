@@ -13,6 +13,7 @@ static DD_METRICS: Lazy<DataDogExporter> = Lazy::new(|| {
         .tags(vec![("tag1".to_string(), "value1".to_string())])
         .write_to_stdout(true)
         .build()
+        .unwrap()
         .install()
         .unwrap()
 });
