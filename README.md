@@ -13,7 +13,7 @@
 ```rust
 #[tokio::main]
 async fn main() {
-    let reporter = DataDogBuilder::default()
+    let exporter = DataDogBuilder::default()
         .tags(vec![
             "tag1".to_string(),
             "val1".to_string()
@@ -21,7 +21,7 @@ async fn main() {
         .build()
         .install()
         .unwrap();
-    reporter.flush.await()?;
+    exporter.flush.await()?;
 }
 ```
 
@@ -29,7 +29,7 @@ async fn main() {
 ```rust
 #[tokio::main]
 async fn main() {
-    let reporter = DataDogBuilder::default()
+    let exporter = DataDogBuilder::default()
         .write_to_stdout(false)
         .write_to_api(true, Some("DD_API_KEY".to_string()))
         .tags(vec![
@@ -39,16 +39,17 @@ async fn main() {
         .build()
         .install()
         .unwrap();
-    reporter.flush.await()?;
+    exporter.flush.await()?;
 }
 ```
 
 ### Writing on a schedule
 ```rust
-use once_cell::sync::Lazy;
-
-static DD_METRICS: Lazy<DataDogHandle> = Lazy::new(|| {
-    DataDogBuilder::default()
+#[tokio::main]
+async fn main() {
+    let exporter = DataDogBuilder::default()
+        .write_to_stdout(false)
+        .write_to_api(true, Some("DD_API_KEY".to_string()))
         .tags(vec![
             "tag1".to_string(),
             "val1".to_string()
@@ -56,11 +57,6 @@ static DD_METRICS: Lazy<DataDogHandle> = Lazy::new(|| {
         .build()
         .install()
         .unwrap();
-});
-
-#[tokio::main]
-async fn main() {
-    let reporter = DD_METRICS.deref();
-    reporter.schedule(Duration::from_secs(10));
+    let (_exporter, _scheduled) = expoerter.schedule(Duration::from_secs(10));
 }
 ```

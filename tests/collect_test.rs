@@ -21,7 +21,7 @@ fn collect_test() -> Result<()> {
     let counter = collected.get("this.counter").unwrap();
     assert_eq!(counter.metric_type, DataDogMetricType::Count);
     assert_eq!(counter.tags, vec!["tag2:value2".to_string()]);
-    assert_eq!(counter.points, vec![DataDogMetricValue::Int(123)]);
+    assert_eq!(counter.points, vec![DataDogMetricValue::Unsigned(123)]);
     let histogram = collected.get("this.histogram").unwrap();
     assert_eq!(histogram.metric_type, DataDogMetricType::Histogram);
     assert_eq!(histogram.points.len(), 2);

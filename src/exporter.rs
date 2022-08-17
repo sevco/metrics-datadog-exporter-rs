@@ -8,7 +8,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use itertools::Itertools;
-use log::{debug, error, log_enabled, Level};
 use metrics::{Key, Label};
 use metrics_util::registry::{AtomicStorage, Registry};
 use reqwest::header::CONTENT_ENCODING;
@@ -16,6 +15,8 @@ use reqwest::{blocking, Client};
 use tokio::spawn;
 use tokio::task::JoinHandle;
 use tokio_schedule::{every, Job};
+use tracing::Level;
+use tracing::{debug, enabled, warn};
 
 use crate::builder::DataDogConfig;
 use crate::data::{DataDogApiPost, DataDogMetric, DataDogSeries};
@@ -44,14 +45,10 @@ fn send_blocking(
             }
 
             let response = request.send()?.error_for_status()?;
-            let status = response.status();
-            let message = response.text()?;
-
-            if log_enabled!(Level::Debug) {
-                debug!(
-                    "Got response from DataDog API status: {}, message: {}",
-                    status, message
-                );
+            if enabled!(Level::DEBUG) {
+                let status = response.status();
+                let message = response.text()?;
+                debug!(status = %status, message = %message, "Response from DataDog API")
             }
         }
     };
@@ -82,12 +79,9 @@ async fn send_async(
         }))
         .await?;
 
-        if log_enabled!(Level::Debug) {
+        if enabled!(Level::DEBUG) {
             responses.into_iter().for_each(|(status, message)| {
-                debug!(
-                    "Got response from DataDog API status: {}, message: {}",
-                    status, message
-                );
+                debug!(status = %status, message = %message, "Response from DataDog API")
             });
         }
     };
@@ -174,16 +168,19 @@ impl DataDogExporter {
     }
 
     /// Write metrics every [`Duration`]
-    pub fn schedule(&'static self, interval: Duration) -> JoinHandle<()> {
-        let every = every(interval.as_secs() as u32)
-            .seconds()
-            .perform(move || async move {
-                let result = self.flush().await;
+    pub fn schedule(self, interval: Duration) -> (Arc<Self>, JoinHandle<()>) {
+        let exporter = Arc::new(self);
+        let scheduled_exporter = exporter.clone();
+        let every = every(interval.as_secs() as u32).seconds().perform(move || {
+            let exporter = scheduled_exporter.clone();
+            async move {
+                let result = exporter.clone().flush().await;
                 if let Err(e) = result {
-                    error!("Failed to flush metrics: {}", e);
+                    warn!(error = ?e, "Failed to flush metrics");
                 }
-            });
-        spawn(every)
+            }
+        });
+        (exporter, spawn(every))
     }
 
     /// Collect metrics
@@ -247,7 +244,7 @@ impl DataDogExporter {
     /// Flush metrics
     pub async fn flush(&self) -> Result<()> {
         let metrics: Vec<DataDogMetric> = self.collect();
-        log::debug!("Flushing {} metrics", metrics.len());
+        debug!("Flushing {} metrics", metrics.len());
 
         if self.write_to_stdout {
             self.write_to_stdout(metrics.as_slice())?;

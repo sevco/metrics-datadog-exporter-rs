@@ -4,6 +4,7 @@
 
 use metrics::SetRecorderError;
 use std::io;
+use std::sync::Arc;
 use std::time::Duration;
 use thiserror::Error;
 use tokio::task::JoinHandle;
@@ -58,7 +59,7 @@ impl DataDogHandle {
     }
 
     /// Write metrics every [`Duration`]
-    pub fn schedule(&'static self, interval: Duration) -> JoinHandle<()> {
+    pub fn schedule(self, interval: Duration) -> (Arc<DataDogExporter>, JoinHandle<()>) {
         self.handle.schedule(interval)
     }
 }
