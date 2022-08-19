@@ -31,8 +31,8 @@ pub enum DataDogMetricType {
 pub enum DataDogMetricValue {
     /// Float
     Float(f64),
-    /// Int
-    Int(u64),
+    /// Unsigned
+    Unsigned(u64),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialOrd, PartialEq)]
@@ -60,7 +60,7 @@ impl DataDogMetric {
             .into_iter()
             .map(|value| {
                 let u = value.load(Ordering::Acquire);
-                DataDogMetricValue::Int(u)
+                DataDogMetricValue::Unsigned(u)
             })
             .collect_vec();
         DataDogMetric::from_metric_value(DataDogMetricType::Count, key, values, global_tags)
