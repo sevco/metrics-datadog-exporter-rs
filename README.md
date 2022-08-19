@@ -26,6 +26,7 @@ async fn main() {
 ```
 
 ### Writing to API
+
 ```rust
 #[tokio::main]
 async fn main() {
@@ -44,6 +45,7 @@ async fn main() {
 ```
 
 ### Writing on a schedule
+
 ```rust
 #[tokio::main]
 async fn main() {
@@ -57,6 +59,6 @@ async fn main() {
         .build()
         .install()
         .unwrap();
-    let (_exporter, _scheduled) = expoerter.schedule(Duration::from_secs(10));
+    let (_exporter, _scheduled) = exporter.schedule(Duration::from_secs(10));
 }
 ```
