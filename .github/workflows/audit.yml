@@ -11,11 +11,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1.0.7
+      - name: Setup Rust
+        shell: sh
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions-rust-lang/audit@v1
+        name: Audit Rust Dependencies
         with:
-          toolchain: stable
-          override: true
-      - uses: Swatinem/rust-cache@v1
-      - uses: actions-rs/audit-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # this is the chrono/time vuln we are unaffected by
+          ignore: RUSTSEC-2020-0071

@@ -11,11 +11,11 @@ jobs:
         with:
           # Fetches entire history, so we can analyze commits since last tag
           fetch-depth: 0
-      - uses: Swatinem/rust-cache@v1
-      - uses: actions-rs/toolchain@v1.0.7
-        with:
-          toolchain: stable
-          override: true
+      - name: Setup Rust
+        shell: sh
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+      - uses: Swatinem/rust-cache@v2
       - name: Install cargo-release
         run: cargo install cargo-release
       - uses: oleksiyrudenko/gha-git-credentials@v2.1
