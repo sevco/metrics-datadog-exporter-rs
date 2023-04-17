@@ -14,7 +14,7 @@ readme = "README.md"
 
 [dependencies]
 metrics = "^0.20"
-metrics-util = "^0.14"
+metrics-util = "^0.15"
 # pinned to metrics version
 portable-atomic = "^0.3"
 parking_lot = "^0.12"
