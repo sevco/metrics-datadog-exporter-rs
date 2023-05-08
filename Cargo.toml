@@ -16,7 +16,7 @@ readme = "README.md"
 metrics = "^0.20"
 metrics-util = "^0.14"
 # pinned to metrics version
-portable-atomic = "^0.3"
+portable-atomic = "^1.3"
 parking_lot = "^0.12"
 thiserror = "^1.0"
 serde = { version = "^1.0", features = ["derive"] }
