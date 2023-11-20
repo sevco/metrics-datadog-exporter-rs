@@ -5,9 +5,10 @@ use std::sync::Arc;
 
 use chrono::Utc;
 use itertools::Itertools;
+use metrics::atomics::AtomicU64;
 use metrics::{Key, Label};
 use metrics_util::AtomicBucket;
-use portable_atomic::AtomicU64;
+
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
