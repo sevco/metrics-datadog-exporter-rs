@@ -2,6 +2,11 @@ name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      release-level:
+        description: "Release level or valid semver"
+        required: true
+        default: "patch"
 
 jobs:
   release:
@@ -21,5 +26,9 @@ jobs:
       - uses: oleksiyrudenko/gha-git-credentials@v2.1
         with:
           token: '${{ secrets.GITHUB_TOKEN }}'
+      - name: Login to registry
+        shell: bash
+        if: inputs.execute == 'true'
+        run: cargo login ${{ secrets.CRATES_IO_TOKEN }}
       - name: Release
-        run: cargo release -x -v --no-confirm --token ${{ secrets.CRATES_IO_TOKEN }}
+        run: cargo release -x -v --no-confirm ${{ inputs.release-level }}
