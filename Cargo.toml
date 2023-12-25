@@ -14,7 +14,7 @@ readme = "README.md"
 
 [dependencies]
 metrics = "0.21.1"
-metrics-util = "0.15.1"
+metrics-util = "0.16.0"
 # pinned to metrics version
 parking_lot = "^0.12"
 thiserror = "^1.0"
